@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Microeconomics Matching Game</title>
+  <meta name="description" content="เกมจับคู่คำศัพท์เศรษฐศาสตร์จุลภาค EN↔TH และ Term↔Diagram พร้อมตัวจับเวลาและสถิติ">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React + ReactDOM UMD -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- Babel for JSX in-browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'TH Sarabun New', 'Noto Sans Thai', Arial, sans-serif; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useEffect, useMemo, useRef, useState } = React;
+
+    // --- Data ----------------------------------------------------
+    const TERMS = [
+      { id: "demand", en: "Demand", th: "อุปสงค์", diagram: "DEMAND", hint: "ความสัมพันธ์ผกผันระหว่างราคาและปริมาณที่ต้องการ" },
+      { id: "supply", en: "Supply", th: "อุปทาน", diagram: "DS_ONLY_S", hint: "ความสัมพันธ์ทางตรงระหว่างราคาและปริมาณเสนอขาย" },
+      { id: "equilibrium", en: "Market Equilibrium", th: "ดุลยภาพของตลาด", diagram: "DS_EQ", hint: "จุด E ที่ Qd = Qs" },
+      { id: "ep", en: "Price Elasticity of Demand (Ep)", th: "ความยืดหยุ่นของอุปสงค์ต่อราคา", diagram: "ELASTICITY", hint: "%ΔQ / %ΔP" },
+      { id: "ey", en: "Income Elasticity (Ey)", th: "ความยืดหยุ่นต่อรายได้", diagram: "ENGEL", hint: "%ΔQ / %ΔY" },
+      { id: "exy", en: "Cross Elasticity (Exy)", th: "ความยืดหยุ่นไขว้", diagram: "CROSS", hint: "%ΔQx / %ΔPy" },
+      { id: "elastic", en: "Elastic Demand", th: "อุปสงค์ยืดหยุ่น", diagram: "ELASTICITY", hint: "เส้น D แบนกว่า" },
+      { id: "inelastic", en: "Inelastic Demand", th: "อุปสงค์ไม่ยืดหยุ่น", diagram: "ELASTICITY", hint: "เส้น D ชันกว่า" },
+      { id: "es", en: "Elasticity of Supply (Es)", th: "ความยืดหยุ่นของอุปทาน", diagram: "ELASTICITY", hint: "ความชันของ S" },
+      { id: "tp", en: "Total Product (TP)", th: "ผลผลิตรวม", diagram: "PRODUCTION", hint: "เส้น TP เพิ่มลดตามปัจจัย" },
+      { id: "ap", en: "Average Product (AP)", th: "ผลผลิตเฉลี่ย", diagram: "PRODUCTION", hint: "AP สูงสุดก่อนลดลง" },
+      { id: "mp", en: "Marginal Product (MP)", th: "ผลผลิตหน่วยสุดท้าย", diagram: "PRODUCTION", hint: "MP ตัด AP ที่จุดสูงสุดของ AP" },
+      { id: "diminishing_returns", en: "Law of Diminishing Returns", th: "กฎผลตอบแทนลดลง", diagram: "PRODUCTION", hint: "MP ลดลงหลังช่วงหนึ่ง" },
+      { id: "tc", en: "Total Cost (TC)", th: "ต้นทุนรวม", diagram: "TC_TFC_TVC", hint: "เส้นโค้ง TC" },
+      { id: "tfc", en: "Total Fixed Cost (TFC)", th: "ต้นทุนคงที่รวม", diagram: "TC_TFC_TVC", hint: "เส้นขนานแกน Q" },
+      { id: "tvc", en: "Total Variable Cost (TVC)", th: "ต้นทุนผันแปรรวม", diagram: "TC_TFC_TVC", hint: "เพิ่มตาม Q" },
+      { id: "ac", en: "Average Cost (AC/ATC)", th: "ต้นทุนเฉลี่ย", diagram: "AC_MC", hint: "รูปตัวยู U-shape" },
+      { id: "mc", en: "Marginal Cost (MC)", th: "ต้นทุนหน่วยสุดท้าย", diagram: "AC_MC", hint: "ตัด AC ที่จุดต่ำสุด" },
+      { id: "economies_of_scale", en: "Economies of Scale", th: "ผลประหยัดต่อขนาด", diagram: "LRAC", hint: "LRAC ลดลงเมื่อขยายขนาด" },
+      { id: "tr", en: "Total Revenue (TR)", th: "รายรับรวม", diagram: "TR_AR_MR", hint: "TR = P×Q" },
+      { id: "ar", en: "Average Revenue (AR)", th: "รายรับเฉลี่ย", diagram: "TR_AR_MR", hint: "AR = D (กรณีเส้นตรง)" },
+      { id: "mr", en: "Marginal Revenue (MR)", th: "รายรับหน่วยสุดท้าย", diagram: "TR_AR_MR", hint: "MR ต่ำกว่า AR ในเส้นตรง" },
+      { id: "factor_income", en: "Factor Income", th: "รายได้ปัจจัยการผลิต", diagram: "FACTOR", hint: "รายได้จาก L,K" },
+      { id: "rent", en: "Rent", th: "ค่าเช่า", diagram: "LAND_DS", hint: "ตลาดที่ดิน" },
+      { id: "wage", en: "Wage", th: "ค่าจ้าง", diagram: "LABOUR_DS", hint: "ตลาดแรงงาน" },
+      { id: "interest", en: "Interest", th: "ดอกเบี้ย", diagram: "LOANABLE_FUNDS", hint: "ตลาดเงินกู้" },
+      { id: "profit", en: "Profit", th: "กำไร", diagram: "TR_TC", hint: "จุด TR ตัด TC" },
+      { id: "ic", en: "Indifference Curve (IC)", th: "เส้นอรรถประโยชน์เท่ากัน", diagram: "IC_BL", hint: "ความชัน = MRS" },
+      { id: "bl", en: "Budget Line (BL)", th: "เส้นงบประมาณ", diagram: "IC_BL", hint: "สัมผัส IC ที่สมดุลผู้บริโภค" },
+      { id: "iq", en: "Isoquant (IQ)", th: "เส้นผลผลิตเท่ากัน", diagram: "ISOQUANT", hint: "ความชัน = MRTS" },
+      { id: "isocost", en: "Isocost", th: "เส้นต้นทุนเท่ากัน", diagram: "ISOQUANT", hint: "เส้นตรง wL+rK=C" },
+      { id: "utility", en: "Utility", th: "อรรถประโยชน์", diagram: "TU_MU", hint: "TU เพิ่ม, MU ลด" },
+      { id: "dmu", en: "Diminishing Marginal Utility", th: "อรรถประโยชน์หน่วยสุดท้ายลดลง", diagram: "TU_MU", hint: "กฎ MU ลดลง" },
+    ];
+
+    // --- Utils ---------------------------------------------------
+    const shuffle = (arr) => arr.map((a) => [Math.random(), a]).sort((a, b) => a[0] - b[0]).map(([, a]) => a);
+    const fmtTime = (s) => {
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return \`\${String(m).padStart(2, "0")}:\${String(r).padStart(2, "0")}\`;
+    };
+
+    // --- SVG Diagrams -------------------------------------------
+    const Axis = ({ xLabel = "Q", yLabel = "P" }) => (
+      <g strokeWidth={1}>
+        <line x1={30} y1={10} x2={30} y2={170} stroke="currentColor" />
+        <line x1={30} y1={170} x2={190} y2={170} stroke="currentColor" />
+        <text x={18} y={18} fontSize={10}>{yLabel}</text>
+        <text x={182} y={182} fontSize={10}>{xLabel}</text>
+      </g>
+    );
+
+    const SUPPORTED_DIAGRAMS = new Set([
+      "DEMAND","DS_ONLY_S","DS_EQ","ELASTICITY","CROSS","PRODUCTION","TC_TFC_TVC","AC_MC","LRAC","TR_AR_MR","MR_MC","LAND_DS","LABOUR_DS","LOANABLE_FUNDS","TR_TC","ISOQUANT","IC_BL","ENGEL","TU_MU","FACTOR"
+    ]);
+
+    function Diagram({ type }) {
+      const common = { width: 220, height: 190, className: "text-black" };
+      switch (type) {
+        case "DEMAND":
+          return (
+            <svg {...common}>
+              <Axis />
+              <line x1={40} y1={40} x2={180} y2={160} stroke="currentColor" />
+              <text x={182} y={48} fontSize={10}>D</text>
+            </svg>
+          );
+        case "DS_ONLY_S":
+          return (
+            <svg {...common}>
+              <Axis />
+              <line x1={40} y1={160} x2={180} y2={40} stroke="currentColor" />
+              <text x={182} y={160} fontSize={10}>S</text>
+            </svg>
+          );
+        case "DS_EQ":
+          return (
+            <svg {...common}>
+              <Axis />
+              <line x1={40} y1={40} x2={180} y2={160} stroke="currentColor" />
+              <line x1={40} y1={160} x2={180} y2={40} stroke="currentColor" />
+              <circle cx={110} cy={100} r={3} fill="currentColor" />
+              <text x={118} y={100} fontSize={10}>E</text>
+            </svg>
+          );
+        case "ELASTICITY":
+          return (
+            <svg {...common}>
+              <Axis />
+              <line x1={40} y1={60} x2={180} y2={130} stroke="currentColor" />
+              <line x1={50} y1={160} x2={180} y2={145} stroke="currentColor" />
+              <text x={182} y={132} fontSize={10}>Elastic</text>
+              <text x={182} y={148} fontSize={10}>Inelastic</text>
+            </svg>
+          );
+        case "CROSS":
+          return (
+            <svg {...common}>
+              <Axis xLabel="P_y" yLabel="Q_x" />
+              <line x1={40} y1={40} x2={180} y2={160} stroke="currentColor" />
+              <text x={90} y={50} fontSize={10}>Exy</text>
+            </svg>
+          );
+        case "PRODUCTION":
+          return (
+            <svg {...common}>
+              <Axis xLabel="L" yLabel="Output" />
+              <path d="M 40 150 C 80 120, 120 80, 180 50" fill="none" stroke="currentColor" />
+              <line x1={40} y1={110} x2={180} y2={110} strokeDasharray="4 3" stroke="currentColor" />
+              <text x={60} y={120} fontSize={10}>AP</text>
+              <text x={130} y={80} fontSize={10}>MP</text>
+            </svg>
+          );
+        case "TC_TFC_TVC":
+          return (
+            <svg {...common}>
+              <Axis xLabel="Q" yLabel="Cost" />
+              <line x1={40} y1={140} x2={180} y2={140} stroke="currentColor" />
+              <path d="M 40 140 C 90 130, 130 120, 180 110" fill="none" stroke="currentColor" />
+              <path d="M 40 150 C 90 145, 140 130, 180 120" fill="none" stroke="currentColor" />
+              <text x={42} y={137} fontSize={9}>TFC</text>
+              <text x={150} y={114} fontSize={9}>TC</text>
+              <text x={152} y={124} fontSize={9}>TVC</text>
+            </svg>
+          );
+        case "AC_MC":
+          return (
+            <svg {...common}>
+              <Axis xLabel="Q" yLabel="Cost" />
+              <path d="M 40 140 C 90 120, 130 120, 180 140" fill="none" stroke="currentColor" />
+              <path d="M 60 160 C 110 90, 140 80, 180 150" fill="none" stroke="currentColor" />
+              <text x={60} y={152} fontSize={10}>MC</text>
+              <text x={82} y={132} fontSize={10}>AC</text>
+            </svg>
+          );
+        case "LRAC":
+          return (
+            <svg {...common}>
+              <Axis xLabel="Q (LR)" yLabel="LRAC" />
+              <path d="M 40 150 C 100 120, 140 110, 180 120" fill="none" stroke="currentColor" />
+              <text x={120} y={120} fontSize={10}>LRAC</text>
+            </svg>
+          );
+        case "TR_AR_MR":
+          return (
+            <svg {...common}>
+              <Axis xLabel="Q" yLabel="Price/Rev" />
+              <line x1={40} y1={130} x2={180} y2={130} stroke="currentColor" />
+              <line x1={40} y1={150} x2={180} y2={100} strokeDasharray="4 3" stroke="currentColor" />
+              <line x1={60} y1={160} x2={180} y2={120} strokeDasharray="4 3" stroke="currentColor" />
+              <text x={170} y={132} fontSize={9}>AR=D</text>
+              <text x_{170} y={122} fontSize={9}>MR</text>
+            </svg>
+          );
+        case "MR_MC":
+          return (
+            <svg {...common}>
+              <Axis xLabel="Q" yLabel="P/Rev/Cost" />
+              <line x1={40} y1={130} x2={180} y2={130} stroke="currentColor" />
+              <path d="M 60 160 C 110 90, 140 80, 180 150" fill="none" stroke="currentColor" />
+              <circle cx={120} cy={130} r={3} fill="currentColor" />
+              <text x={126} y={122} fontSize={10}>MR=MC</text>
+              <text x={170} y={124} fontSize={10}>MR</text>
+              <text x={82} y={132} fontSize={10}>MC</text>
+            </svg>
+          );
+        case "TR_TC":
+          return (
+            <svg {...common}>
+              <Axis xLabel="Q" yLabel="฿" />
+              <path d="M 40 160 C 100 140, 140 110, 180 90" fill="none" stroke="currentColor" />
+              <path d="M 40 160 C 90 150, 130 135, 180 120" fill="none" stroke="currentColor" />
+              <text x={170} y={92} fontSize={9}>TR</text>
+              <text x={170} y={122} fontSize={9}>TC</text>
+            </svg>
+          );
+        case "FACTOR":
+          return (
+            <svg {...common}>
+              <Axis xLabel="Factor Q" yLabel="Factor Price" />
+              <line x1={40} y1={160} x2={180} y2={40} stroke="currentColor" />
+              <line x1={40} y1={40} x2={180} y2={160} stroke="currentColor" />
+            </svg>
+          );
+        case "LAND_DS":
+          return (
+            <svg {...common}>
+              <Axis xLabel="Land (Q)" yLabel="Rent (P)" />
+              <line x1={60} y1={30} x2={60} y2={170} stroke="currentColor" />
+              <line x1={40} y1={160} x2={180} y2={40} stroke="currentColor" />
+              <text x={62} y={40} fontSize={10}>S_land</text>
+              <text x={182} y={46} fontSize={10}>D_land</text>
+            </svg>
+          );
+        case "LABOUR_DS":
+          return (
+            <svg {...common}>
+              <Axis xLabel="Labour (Q)" yLabel="Wage (W)" />
+              <line x1={40} y1={160} x2={180} y2={40} stroke="currentColor" />
+              <line x1={40} y1={40} x2={180} y2={160} stroke="currentColor" />
+              <text x={182} y={46} fontSize={10}>D_L</text>
+              <text x={182} y={160} fontSize={10}>S_L</text>
+            </svg>
+          );
+        case "LOANABLE_FUNDS":
+          return (
+            <svg {...common}>
+              <Axis xLabel="Funds (Q)" yLabel="Interest (r)" />
+              <line x1={40} y1={160} x2={180} y2={40} stroke="currentColor" />
+              <line x1={40} y1={40} x2={180} y2={160} stroke="currentColor" />
+              <text x={182} y={46} fontSize={10}>D_f</text>
+              <text x={182} y={160} fontSize={10}>S_f</text>
+            </svg>
+          );
+        case "ISOQUANT":
+          return (
+            <svg {...common}>
+              <Axis xLabel="L" yLabel="K" />
+              <path d="M 40 150 C 90 120, 130 100, 180 80" fill="none" stroke="currentColor" />
+              <path d="M 40 170 C 90 140, 130 120, 180 100" fill="none" stroke="currentColor" />
+              <line x1={40} y1={130} x2={180} y2={90} stroke="currentColor" />
+              <text x={180} y={82} fontSize={10}>IQ</text>
+              <text x={182} y={94} fontSize={10}>Isocost</text>
+            </svg>
+          );
+        case "IC_BL":
+          return (
+            <svg {...common}>
+              <Axis xLabel="X" yLabel="Y" />
+              <path d="M 40 150 C 90 110, 130 90, 180 80" fill="none" stroke="currentColor" />
+              <path d="M 40 170 C 90 130, 130 110, 180 95" fill="none" stroke="currentColor" />
+              <line x1={40} y1={120} x2={180} y2={160} stroke="currentColor" />
+              <circle cx={120} cy={130} r={3} fill="currentColor" />
+              <text x={124} y={122} fontSize={10}>Equilibrium</text>
+              <text x={178} y={82} fontSize={10}>IC</text>
+              <text x={182} y={162} fontSize={10}>BL</text>
+            </svg>
+          );
+        case "ENGEL":
+          return (
+            <svg {...common}>
+              <Axis xLabel="Income" yLabel="Quantity" />
+              <path d="M 40 160 C 80 130, 120 90, 180 70" fill="none" stroke="currentColor" />
+              <text x={140} y={78} fontSize={10}>Engel</text>
+            </svg>
+          );
+        case "TU_MU":
+          return (
+            <svg {...common}>
+              <Axis xLabel="Q" yLabel="Utility" />
+              <path d="M 40 160 C 90 130, 130 100, 180 80" fill="none" stroke="currentColor" />
+              <path d="M 40 120 C 90 100, 130 90, 180 85" fill="none" stroke="currentColor" />
+              <text x={170} y={82} fontSize={9}>TU</text>
+              <text x={170} y={88} fontSize={9}>MU</text>
+            </svg>
+          );
+        default:
+          return null;
+      }
+    }
+
+    // --- Drag & Drop + Game state -------------------------------
+    function usePairs(sourceItems, pairCount, mode) {
+      const pool = React.useMemo(() => shuffle(sourceItems).slice(0, pairCount), [sourceItems, pairCount]);
+      const rightPool = React.useMemo(() => {
+        if (mode === "EN_TH") return shuffle(pool.map((t) => ({ key: t.id, label: t.th })));
+        return shuffle(pool.map((t) => ({ key: t.id, diagram: t.diagram })));
+      }, [pool, mode]);
+
+      const [answers, setAnswers] = React.useState({}); // id -> matchedKey
+      const correctCount = Object.entries(answers).filter(([id, key]) => id === key).length;
+      const reset = () => setAnswers({});
+      return { pool, rightPool, answers, setAnswers, correctCount, reset };
+    }
+
+    // --- Leaderboard (localStorage) -----------------------------
+    const LB_KEY = (mode, pairCount) => \`microecon-best-\${mode}-\${pairCount}\`;
+    const getBest = (mode, pairCount) => {
+      try { const v = localStorage.getItem(LB_KEY(mode, pairCount)); return v ? Number(v) : null; } catch { return null; }
+    };
+    const setBest = (mode, pairCount, secs) => {
+      try { const prev = getBest(mode, pairCount); if (prev == null || secs < prev) localStorage.setItem(LB_KEY(mode, pairCount), String(secs)); } catch {}
+    };
+
+    // --- Components ---------------------------------------------
+    function Tile({ id, children, draggable = true }) {
+      const onDragStart = (e) => { e.dataTransfer.setData("text/plain", id); };
+      return (
+        <div draggable={draggable} onDragStart={onDragStart} className="rounded-2xl border border-slate-300 bg-white p-3 shadow-sm hover:shadow-md transition text-sm">
+          {children}
+        </div>
+      );
+    }
+
+    function DropZone({ targetId, onDrop, filled, children }) {
+      const handleDrop = (e) => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain"); onDrop(targetId, id); };
+      return (
+        <div onDragOver={(e) => e.preventDefault()} onDrop={handleDrop} className={\`rounded-2xl border-2 p-3 min-h-[56px] flex items-center justify-center text-center \${filled ? "border-emerald-400 bg-emerald-50" : "border-slate-300 bg-slate-50"}\`}>
+          {children}
+        </div>
+      );
+    }
+
+    function DebugPanel() {
+      const [open, setOpen] = React.useState(false);
+      const [tests, setTests] = React.useState(null);
+      function runTests() {
+        const results = [];
+        const used = new Set(TERMS.map(t => t.diagram));
+        const unsupported = Array.from(used).filter(d => !SUPPORTED_DIAGRAMS.has(d));
+        results.push({ name: "Diagrams supported", pass: unsupported.length === 0, detail: unsupported.length ? \`Unsupported: \${unsupported.join(", ")}\` : "OK" });
+        const ids = TERMS.map(t => t.id).sort();
+        const ids2 = shuffle(TERMS).map(t => t.id).sort();
+        results.push({ name: "Shuffle stable set", pass: JSON.stringify(ids) === JSON.stringify(ids2), detail: "OK" });
+        const sizes = [8, 12, 16];
+        for (const n of sizes) { const pool = shuffle(TERMS).slice(0, n); results.push({ name: \`Pool size \${n}\`, pass: pool.length === n, detail: \`len=\${pool.length}\` }); }
+        return results;
+      }
+      return (
+        <div className="mt-4">
+          <button onClick={() => setOpen(v => !v)} className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs">{open ? "Hide" : "Debug"}</button>
+          {open && (
+            <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <button onClick={() => setTests(runTests())} className="rounded-md border px-2 py-1 text-xs">Run tests</button>
+              {tests && (
+                <ul className="mt-2 space-y-1 text-xs">
+                  {tests.map((t, i) => (
+                    <li key={i} className={t.pass ? "text-emerald-700" : "text-rose-700"}>
+                      {t.pass ? "✔" : "✖"} {t.name} — {t.detail}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // --- App -----------------------------------------------------
+    function App() {
+      const [mode, setMode] = React.useState("EN_TH"); // Default A: EN↔TH
+      const [pairCount, setPairCount] = React.useState(8); // 8 | 12 | 16
+      const { pool, rightPool, answers, setAnswers, correctCount, reset } = usePairs(TERMS, pairCount, mode);
+
+      const [secs, setSecs] = React.useState(0);
+      const [running, setRunning] = React.useState(false);
+      const timerRef = React.useRef(null);
+
+      React.useEffect(() => {
+        if (running) {
+          timerRef.current = setInterval(() => setSecs((s) => s + 1), 1000);
+        } else if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        return () => { if (timerRef.current) clearInterval(timerRef.current); };
+      }, [running]);
+
+      const onDrop = (targetId, incomingId) => {
+        if (!running && secs === 0) setRunning(true);
+        setAnswers((prev) => ({ ...prev, [targetId]: incomingId }));
+      };
+
+      const allDone = correctCount === Object.keys(answers).length && correctCount === pool.length && pool.length > 0;
+      React.useEffect(() => {
+        if (allDone && running) {
+          setRunning(false);
+          setBest(mode, pairCount, secs);
+        }
+      }, [allDone, running, secs, mode, pairCount]);
+
+      const bestTime = getBest(mode, pairCount);
+
+      const doResetRound = () => { setRunning(false); setSecs(0); reset(); };
+      const changeMode = (m) => { setMode(m); doResetRound(); };
+      const changePairs = (n) => { setPairCount(n); doResetRound(); };
+
+      const doHint = () => {
+        for (const t of pool) {
+          if (answers[t.id] !== t.id) { setAnswers((prev) => ({ ...prev, [t.id]: t.id })); break; }
+        }
+      };
+      const doReveal = () => {
+        const filled = Object.fromEntries(pool.map((t) => [t.id, t.id]));
+        setAnswers(filled);
+        if (!allDone) { setRunning(false); setBest(mode, pairCount, secs || 9999); }
+      };
+
+      return (
+        <div className="p-6">
+          <div className="mx-auto max-w-6xl">
+            <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">เกมจับคู่คำศัพท์เศรษฐศาสตร์จุลภาค</h1>
+                <p className="text-sm text-slate-600">ลากคำศัพท์ไปวางตรงคำแปลหรือภาพให้ถูกต้อง • โหมด: ข้อความ หรือ คำศัพท์ ↔ ภาพ • มีเวลาและเฉลย</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <select className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" value={mode} onChange={(e) => changeMode(e.target.value)}>
+                  <option value="EN_TH">EN ↔ TH (ข้อความ)</option>
+                  <option value="TERM_IMG">Term ↔ Diagram (ภาพ)</option>
+                </select>
+                <select className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" value={pairCount} onChange={(e) => changePairs(Number(e.target.value))}>
+                  <option value={8}>8 คู่</option>
+                  <option value={12}>12 คู่</option>
+                  <option value={16}>16 คู่</option>
+                </select>
+                <button onClick={doResetRound} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm hover:shadow">สุ่มใหม่</button>
+                <button onClick={doHint} className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm shadow-sm hover:shadow">ใบ้คำ (เติมให้ 1 คู่)</button>
+                <button onClick={doReveal} className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-sm shadow-sm hover:shadow">เฉลยทั้งหมด</button>
+              </div>
+            </header>
+
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3 items-center">
+              <div className="text-sm">ทำถูกแล้ว: <span className="font-semibold text-emerald-700">{correctCount}</span> / {pool.length}</div>
+              <div className="text-sm">เวลา: <span className="font-semibold">{fmtTime(secs)}</span> {running ? "⏱️" : ""}</div>
+              <div className="text-sm">สถิติที่ดีที่สุด (โหมด {mode === "EN_TH" ? "EN↔TH" : "Term↔Image"}, {pairCount} คู่): <span className="font-semibold text-indigo-700">{bestTime != null ? fmtTime(bestTime) : "—"}</span></div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-3">
+                <h2 className="text-sm font-semibold text-slate-700">ลากจากฝั่งซ้าย ➜ ไปวางฝั่งขวา</h2>
+                {pool.map((t) => (
+                  <Tile key={t.id} id={t.id}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold">{t.en}</div>
+                        <div className="text-xs text-slate-500">{t.hint}</div>
+                      </div>
+                    </div>
+                  </Tile>
+                ))}
+              </div>
+
+              <div className="space-y-3">
+                <h2 className="text-sm font-semibold text-slate-700">ปลายทาง (คำแปลหรือภาพ)</h2>
+                {rightPool.map((r) => {
+                  const targetId = r.key;
+                  const matched = answers[targetId];
+                  const isCorrect = matched && matched === targetId;
+                  return (
+                    <DropZone key={targetId} targetId={targetId} onDrop={onDrop} filled={isCorrect}>
+                      {mode === "EN_TH" ? (
+                        <div className="text-sm">{r.label}</div>
+                      ) : (
+                        <div className="flex items-center gap-3"><Diagram type={r.diagram} /></div>
+                      )}
+                    </DropZone>
+                  );
+                })}
+              </div>
+            </div>
+
+            {correctCount === pool.length && pool.length > 0 && (
+              <div className="mt-4 rounded-xl bg-emerald-100 px-3 py-2 text-emerald-700 text-sm inline-block">เยี่ยมมาก! จับคู่ถูกทั้งหมดแล้ว 🎉 เวลา: {fmtTime(secs)}</div>
+            )}
+
+            <DebugPanel />
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
